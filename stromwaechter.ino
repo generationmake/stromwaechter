@@ -271,13 +271,14 @@ void setup() {
 
   i2c_write_byte(0x20,0x03,0);
   i2c_write_byte(0x20,0x01,0xFF);
-  i2c_write_word(0x40,0x05,swap_bytes(0x0800));
-  i2c_write_word(0x41,0x05,swap_bytes(0x0800));
-  i2c_write_word(0x42,0x05,swap_bytes(0x0800));
-  i2c_write_word(0x43,0x05,swap_bytes(0x0800));
+  i2c_write_word(0x40,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
+  i2c_write_word(0x41,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
+  i2c_write_word(0x42,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
+  i2c_write_word(0x43,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
   
   // input voltage:
-  input_voltage=(analogRead(A0))*17.5/1024.0;
+//  input_voltage=(analogRead(A0))*17.5/1024.0; // for volateg divider 330k|20k
+  input_voltage=(analogRead(A0))*18.37/1024.0; // for volateg divider 330k|19k
   Serial.print("Input voltage: ");
   Serial.println(input_voltage);
   
@@ -313,7 +314,8 @@ void loop() {
   }
 
   // input voltage:
-  input_voltage=(analogRead(A0))*17.5/1024.0;
+//  input_voltage=(analogRead(A0))*17.5/1024.0; // for volateg divider 330k|20k
+  input_voltage=(analogRead(A0))*18.37/1024.0; // for volateg divider 330k|19k
   Serial.print("Input voltage: ");
   Serial.println(input_voltage);
   
