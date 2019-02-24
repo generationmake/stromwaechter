@@ -17,6 +17,7 @@ it reads all the sensors and sends the status every 10 seconds.
 #include <Wire.h> // i2c-bib
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include "i2c_helper.h"
 
 float input_voltage;
 float temp_ds=0;
@@ -43,94 +44,6 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 long lastMsg = 0;
 char msg[50];
-int value = 0;
-
-unsigned short int swap_bytes(unsigned short int input)
-{
-  return (((input & 0xff) << 8) | ((input >> 8) & 0xff));
-}
-
-void i2c_write(char address, char value)
-{
-  Wire.beginTransmission(address);
-  Wire.write(value);
-  Wire.endTransmission();
-}
-void i2c_write_byte(char address, char reg, char value)
-{
-  Wire.beginTransmission(address);
-  Wire.write(reg); // power up continous mode
-  Wire.write(value);
-  Wire.endTransmission();
-}
-void i2c_write_word(char address, char reg, short int value)
-{
-  Wire.beginTransmission(address);
-  Wire.write(reg); // power up continous mode
-  Wire.write((value&0xff00)>>8);
-  Wire.write(value&0x00ff);
-  Wire.endTransmission();
-}
-char i2c_read_byte(char address, char reg)
-{
-  char x=0;
-  Wire.beginTransmission(address);
-  Wire.write(reg); // power up state
-  Wire.endTransmission();
-  Wire.requestFrom(address,1);
-  if(Wire.available()) x=Wire.read();
-  Wire.endTransmission();
-  return x;
-}
-char i2c_smbus_read_byte_data(char address, char reg)
-{
-  return i2c_read_byte(address, reg);
-}
-short int i2c_read_word(char address, char reg)
-{
-  short int x=0;
-  Wire.beginTransmission(address);
-  Wire.write(reg); // power up state
-  Wire.endTransmission();
-  Wire.requestFrom(address,2);
-  if(Wire.available()) x=Wire.read();
-  x=x<<8;
-  if(Wire.available()) x=x|Wire.read();
-  Wire.endTransmission();
-  return x;
-}
-int i2c_read_wordp(char address, char reg)
-{
-  int x=0;
-  Wire.beginTransmission(address);
-  Wire.write(reg); // power up state
-  Wire.endTransmission();
-  Wire.requestFrom(address,3);
-  if(Wire.available()) x=Wire.read();
-  x=x<<8;
-  if(Wire.available()) x=x|Wire.read();
-  x=x<<4;
-  if(Wire.available()) x=x|(Wire.read()>>4);
-  Wire.endTransmission();
-  return x;
-}
-short int i2c_read_word_rev(char address, char reg)
-{
-  short int x=0;
-  Wire.beginTransmission(address);
-  Wire.write(reg); // power up state
-  Wire.endTransmission();
-  Wire.requestFrom(address,2);
-  if(Wire.available()) x=Wire.read();
-  if(Wire.available()) x=x|(Wire.read()<<8);
-  Wire.endTransmission();
-  return x;
-}
-short int i2c_smbus_read_word_data(char address, char reg)
-{
-  return i2c_read_word_rev(address, reg);
-}
-
 
 void setup_wifi() {
 
@@ -217,25 +130,8 @@ void setup() {
   Serial.println(DS18B20.getDeviceCount());
   Serial.print("Parasite power mode: ");
   Serial.println(DS18B20.isParasitePowerMode());
-// variables for DS18B20
-  int temp_count=0;
 
-  if(DS18B20.getDeviceCount()>0)
-  {
-    do {
-      DS18B20.requestTemperatures(); 
-//      DS18B20.requestTemperaturesByIndex(0); 
-      delay(1000);  // delay for parasite power
-      temp_ds = DS18B20.getTempCByIndex(0);
-      Serial.print("Temperature: ");
-      Serial.println(temp_ds);
-      temp_count++;
-      yield();
-    } while ((temp_ds == 85.0 || temp_ds == (-127.0)) && temp_count < 20);
-    if(temp_count==20) temp_ds=0;
-  }
-
-  Serial.println("Scanning...");
+  Serial.println("Scanning I2C...");
  
   nDevices = 0;
   for(address = 1; address < 127; address++ )
@@ -276,77 +172,69 @@ void setup() {
   i2c_write_word(0x42,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
   i2c_write_word(0x43,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
   
-  // input voltage:
-//  input_voltage=(analogRead(A0))*17.5/1024.0; // for volateg divider 330k|20k
-  input_voltage=(analogRead(A0))*18.37/1024.0; // for volateg divider 330k|19k
-  Serial.print("Input voltage: ");
-  Serial.println(input_voltage);
-  
-  
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 }
 
 void loop() {
-
   int temp_count=0;
+  
   if (!client.connected()) {
     reconnect();
   }
   client.loop();
 
   long now = millis();
-  if (now - lastMsg > 10000) {
-  if(DS18B20.getDeviceCount()>0)
+  if (now - lastMsg > 10000)  // send message every 10 seconds
   {
-    do {
-      DS18B20.requestTemperatures(); 
-//      DS18B20.requestTemperaturesByIndex(0); 
-      delay(1000);  // delay for parasite power
-      temp_ds = DS18B20.getTempCByIndex(0);
-      Serial.print("Temperature: ");
-      Serial.println(temp_ds);
-      temp_count++;
-      yield();
-    } while ((temp_ds == 85.0 || temp_ds == (-127.0)) && temp_count < 20);
-    if(temp_count==20) temp_ds=0;
-  }
-
-  // input voltage:
-//  input_voltage=(analogRead(A0))*17.5/1024.0; // for volateg divider 330k|20k
-  input_voltage=(analogRead(A0))*18.37/1024.0; // for volateg divider 330k|19k
-  Serial.print("Input voltage: ");
-  Serial.println(input_voltage);
+    if(DS18B20.getDeviceCount()>0)
+    {
+      do {
+        DS18B20.requestTemperatures(); 
+  //      DS18B20.requestTemperaturesByIndex(0); 
+        delay(1000);  // delay for parasite power
+        temp_ds = DS18B20.getTempCByIndex(0);
+        Serial.print("Temperature: ");
+        Serial.println(temp_ds);
+        temp_count++;
+        yield();
+      } while ((temp_ds == 85.0 || temp_ds == (-127.0)) && temp_count < 20);
+      if(temp_count==20) temp_ds=0;
+    }
   
-
-  voltage1=i2c_read_word(0x40, 0x02)*0.00125;
-  Serial.print("   Voltage 1: (V)");
-  Serial.println(voltage1);
-  current1=i2c_read_word(0x40, 0x04)*0.00025;
-  Serial.print("   Current 1: (A)");
-  Serial.println(current1);
-  voltage2=i2c_read_word(0x41, 0x02)*0.00125;
-  Serial.print("   Voltage 2: (V)");
-  Serial.println(voltage2);
-  current2=i2c_read_word(0x41, 0x04)*0.00025;
-  Serial.print("   Current 2: (A)");
-  Serial.println(current2);
-  voltage3=i2c_read_word(0x42, 0x02)*0.00125;
-  Serial.print("   Voltage 3: (V)");
-  Serial.println(voltage3);
-  current3=i2c_read_word(0x42, 0x04)*0.00025;
-  Serial.print("   Current 3: (A)");
-  Serial.println(current3);
-  voltage4=i2c_read_word(0x43, 0x02)*0.00125;
-  Serial.print("   Voltage 4: (V)");
-  Serial.println(voltage4);
-  current4=i2c_read_word(0x43, 0x04)*0.00025;
-  Serial.print("   Current 4: (A)");
-  Serial.println(current4);
+    // input voltage:
+  //  input_voltage=(analogRead(A0))*17.5/1024.0; // for volateg divider 330k|20k
+    input_voltage=(analogRead(A0))*18.37/1024.0; // for volateg divider 330k|19k
+    Serial.print("Input voltage: ");
+    Serial.println(input_voltage);
+    
+    voltage1=i2c_read_word(0x40, 0x02)*0.00125;
+    Serial.print("   Voltage 1: (V)");
+    Serial.println(voltage1);
+    current1=i2c_read_word(0x40, 0x04)*0.00025;
+    Serial.print("   Current 1: (A)");
+    Serial.println(current1);
+    voltage2=i2c_read_word(0x41, 0x02)*0.00125;
+    Serial.print("   Voltage 2: (V)");
+    Serial.println(voltage2);
+    current2=i2c_read_word(0x41, 0x04)*0.00025;
+    Serial.print("   Current 2: (A)");
+    Serial.println(current2);
+    voltage3=i2c_read_word(0x42, 0x02)*0.00125;
+    Serial.print("   Voltage 3: (V)");
+    Serial.println(voltage3);
+    current3=i2c_read_word(0x42, 0x04)*0.00025;
+    Serial.print("   Current 3: (A)");
+    Serial.println(current3);
+    voltage4=i2c_read_word(0x43, 0x02)*0.00125;
+    Serial.print("   Voltage 4: (V)");
+    Serial.println(voltage4);
+    current4=i2c_read_word(0x43, 0x04)*0.00025;
+    Serial.print("   Current 4: (A)");
+    Serial.println(current4);
 
     lastMsg = now;
-    ++value;
     snprintf (msg, 50, "%f", input_voltage);
     Serial.print("Publish message: ");
     Serial.println(msg);
