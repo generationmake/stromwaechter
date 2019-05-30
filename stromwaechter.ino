@@ -19,6 +19,8 @@ it reads all the sensors and sends the status every 10 seconds.
 #include <DallasTemperature.h>
 #include "i2c_helper.h"
 
+#define ledPin 12    // Die verlötete blaue LED
+
 float input_voltage;
 float temp_ds=0;
 float voltage1;
@@ -36,6 +38,7 @@ DallasTemperature DS18B20(&oneWire);
 
 // Update these with values suitable for your network.
 
+const char* versionsstand = "esp8266_stromwaechter_v1.0_20190527";   //wird an MQTT-Broker gesendet
 const char* ssid = "openhab";
 const char* password = "openhabopenhab";
 const char* mqtt_server = "192.168.35.1";
@@ -44,6 +47,9 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 long lastMsg = 0;
 char msg[50];
+char esp_mac[18];     //Puffer für ESP-Mac-Adresse
+char esp_ip[17];
+IPAddress ip;         //the IP address of your shield
 
 void setup_wifi() {
 
@@ -64,7 +70,7 @@ void setup_wifi() {
 
   Serial.println("");
   Serial.println("WiFi connected");
-  Serial.println("IP address: ");
+  Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 }
 
@@ -79,11 +85,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   // Switch on the LED if an 1 was received as first character
   if ((char)payload[0] == '1') {
-    digitalWrite(12, LOW);   // Turn the LED on (Note that LOW is the voltage level
+    digitalWrite(ledPin, LOW);   // Turn the LED on (Note that LOW is the voltage level
     // but actually the LED is on; this is because
     // it is active low on the ESP-01)
   } else {
-    digitalWrite(12, HIGH);  // Turn the LED off by making the voltage HIGH
+    digitalWrite(ledPin, HIGH);  // Turn the LED off by making the voltage HIGH
   }
 
 }
@@ -116,7 +122,7 @@ void setup() {
   byte error,address,x;
   short int sx=0;
   int nDevices;
-  pinMode(12, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
+  pinMode(ledPin, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
   Serial.begin(115200);
 
   Wire.begin(4,5); // 4-data, 5-clk for nodeESP
@@ -173,12 +179,34 @@ void setup() {
   i2c_write_word(0x43,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
   
   setup_wifi();
+  byte temp[6];
+
+  //IP-Adresse holen, formatieren und ausgeben
+  ip = WiFi.localIP();
+  sprintf(esp_ip, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+  Serial.println("ESP WiFi verbunden");
+  Serial.print("ESP WebUpdate: http://");
+  Serial.print(esp_ip);
+  Serial.println("/update");
+
+  //MAC-Adresse holen, formatieren und ausgeben
+  WiFi.macAddress(temp);
+  sprintf(esp_mac, "%02x-%02x-%02x-%02x-%02x-%02x", temp[0], temp[1], temp[2], temp[3], temp[4], temp[5]);
+  Serial.print("ESP MAC: ");
+  Serial.println(esp_mac);
+
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 }
 
 void loop() {
+char esp_sub[50];     //Puffer für subscribe-String
+char esp_pub[80];     //Puffer für publish-String
+  byte addr[8];
+  long rssi;    //Wlan Signalstärke
+  long quali;   //Signalqualität in Prozent
   int temp_count=0;
+  static int delay_count=0;
   
   if (!client.connected()) {
     reconnect();
@@ -235,6 +263,44 @@ void loop() {
     Serial.println(current4);
 
     lastMsg = now;
+    if ( delay_count > 0 ) delay_count--;
+    if ( delay_count == 0 ) {         //alle 600 sekunden
+      delay_count = 6;
+//      delay_count = 60;
+      // Sende Versionsstand
+      strcpy(esp_pub, esp_mac);                 //Publish-Topic zusammensetzen aus MAC + Topic
+      strcat(esp_pub, "/version");
+      client.publish(esp_pub, versionsstand );  //Modul sendet in dieses Topic
+      Serial.println("Sende - Version");
+
+      // Sende MAC
+      strcpy(esp_pub, esp_mac);                 //Publish-Topic zusammensetzen aus MAC + Topic
+      strcat(esp_pub, "/mac");
+      client.publish(esp_pub, esp_mac );        //Modul sendet in dieses Topic
+      Serial.println("Sende - mac");      
+
+      // Sende IP
+      strcpy(esp_pub, esp_mac);                 //Publish-Topic zusammensetzen aus MAC + Topic
+      strcat(esp_pub, "/ip");
+      client.publish(esp_pub, esp_ip );         //Modul sendet in dieses Topic
+      Serial.println("Sende - IP");      
+
+
+      // Sende WLan Qualität
+      rssi = WiFi.RSSI();
+      quali = 2*(rssi +100);
+      if (quali > 100) { quali = 100; }
+      if (quali < 0 ) { quali = 0; } 
+      sprintf(msg, "%ddBm / %d%%", rssi, quali);
+      strcpy(esp_pub, esp_mac);                 //Publish-Topic zusammensetzen aus MAC + Topic
+      strcat(esp_pub, "/wlan");
+      client.publish(esp_pub, msg);
+      Serial.print("Sende - WLan Qualitaet: ");        
+      Serial.print(esp_pub);        
+      Serial.println(msg);        
+
+    }
+
     snprintf (msg, 50, "%f", input_voltage);
     Serial.print("Publish message: ");
     Serial.println(msg);
