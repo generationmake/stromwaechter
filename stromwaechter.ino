@@ -7,6 +7,7 @@
  * 2019-05-27 - added mqtt topics from earlier versions: version, mac, ip, wifi quality
  * 2019-05-30 - cleaned up code and comments
  * 2019-06-01 - made mqtt messages more modular; included mac address in mqtt message
+ * 2019-06-01 - added state to mqtt messages
  
  Based on the Basic ESP8266 MQTT example of the PubSubClient library.
 
@@ -18,6 +19,7 @@ MQTT messages:
 <mac>/temperature          - temperature of board
 <mac>/<numsensor>/voltage  - voltage in volt of channel
 <mac>/<numsensor>/current  - current in ampere of channel
+<mac>/<numsensor>/state    - state of channel (1=on; 0=off)
 <mac>/version              - firmware version
 <mac>/ip                   - ip address of board
 <mac>/mac                  - mac address of board
@@ -35,10 +37,8 @@ MQTT messages:
 #include <DallasTemperature.h>
 #include "i2c_helper.h"
 
-#define ledPin 12    // the blue LED
+#define ledPin 12       // the blue LED
 #define NUM_SENSORS 4   // define number of sensors
-
-float temp_ds=0;
 
 #define ONE_WIRE_BUS 2  // DS18B20 pin
 OneWire oneWire(ONE_WIRE_BUS);
@@ -46,7 +46,7 @@ DallasTemperature DS18B20(&oneWire);
 
 // Update these with values suitable for your network.
 
-const char* versionsstand = "esp8266_stromwaechter_vx.y_20190530";   //is sent to MQTT broker
+const char* versionstring = "esp8266_stromwaechter_vx.y_20190601";   //is sent to MQTT broker
 const char* ssid = "openhab";
 const char* password = "openhabopenhab";
 const char* mqtt_server = "192.168.35.1";
@@ -60,7 +60,6 @@ char esp_ip[17];      //buffer for IP address
 IPAddress ip;         //the IP address of your shield
 
 void setup_wifi() {
-
   delay(10);
   // We start by connecting to a WiFi network
   Serial.println();
@@ -97,7 +96,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
   } else {
     digitalWrite(ledPin, HIGH);  // Turn the LED off by making the voltage HIGH
   }
-
 }
 
 void reconnect() {
@@ -206,12 +204,12 @@ void setup() {
 void loop() {
   char esp_sub[50];     //buffer for subscribe string
   char esp_pub[80];     //buffer for publish string
-//  byte addr[8];
   long rssi;    //wifi signal strength
   long quali;   //wifi signal quality
   int temp_count=0;
   static int delay_count=0;
   float input_voltage;
+  float temp_ds=0;
   float current=0, voltage=0;
   int i=0;
   
@@ -251,7 +249,7 @@ void loop() {
 //      delay_count = 60;
       // send version
       snprintf (esp_pub, 50, "%s/version", esp_mac); // create topic with mac address
-      client.publish(esp_pub, versionsstand );  //module sends to this topic
+      client.publish(esp_pub, versionstring );  //module sends to this topic
       Serial.println("send - version");
 
       // send MAC
@@ -264,7 +262,6 @@ void loop() {
       client.publish(esp_pub, esp_ip );         //module sends to this topic
       Serial.println("send - IP");      
 
-
       // send wifi quality
       rssi = WiFi.RSSI();
       quali = 2*(rssi +100);
@@ -276,7 +273,6 @@ void loop() {
       Serial.print("send - wifi quality: ");        
       Serial.print(esp_pub);        
       Serial.println(msg);        
-
     }
 
     Serial.println("Publish mqtt messages");
@@ -302,6 +298,9 @@ void loop() {
       client.publish(esp_pub, msg);
       snprintf (msg, 50, "%f", current);
       snprintf (esp_pub, 50, "%s/%i/current", esp_mac, i+1); // create topic with mac address
+      client.publish(esp_pub, msg);
+      snprintf (msg, 50, "1");
+      snprintf (esp_pub, 50, "%s/%i/state", esp_mac, i+1); // create topic with mac address
       client.publish(esp_pub, msg);
     }
   }
