@@ -6,11 +6,25 @@
  * 2019-02-24 - initial version
  * 2019-05-27 - added mqtt topics from earlier versions: version, mac, ip, wifi quality
  * 2019-05-30 - cleaned up code and comments
-
+ * 2019-06-01 - made mqtt messages more modular; included mac address in mqtt message
  
  Based on the Basic ESP8266 MQTT example of the PubSubClient library.
 
 it reads all the sensors and sends the status every 10 seconds.
+
+MQTT messages:
+
+<mac>/vbus                 - bus voltage in volt
+<mac>/temperature          - temperature of board
+<mac>/<numsensor>/voltage  - voltage in volt of channel
+<mac>/<numsensor>/current  - current in ampere of channel
+<mac>/version              - firmware version
+<mac>/ip                   - ip address of board
+<mac>/mac                  - mac address of board
+<mac>/wlan                 - wifi quality
+
+<mac> is like b4-e6-2d-3f-62-05
+<numsensor> is 1 for the first channel, 2 for the second and so on
 
 */
 
@@ -22,17 +36,9 @@ it reads all the sensors and sends the status every 10 seconds.
 #include "i2c_helper.h"
 
 #define ledPin 12    // the blue LED
+#define NUM_SENSORS 4   // define number of sensors
 
-float input_voltage;
 float temp_ds=0;
-float voltage1;
-float current1;
-float voltage2;
-float current2;
-float voltage3;
-float current3;
-float voltage4;
-float current4;
 
 #define ONE_WIRE_BUS 2  // DS18B20 pin
 OneWire oneWire(ONE_WIRE_BUS);
@@ -119,8 +125,8 @@ void reconnect() {
 }
 
 void setup() {
-  byte error,address,x;
-  short int sx=0;
+  byte error,address,i;
+  byte temp[6];
   int nDevices;
   pinMode(ledPin, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
   Serial.begin(115200);
@@ -173,13 +179,12 @@ void setup() {
 
   i2c_write_byte(0x20,0x03,0);
   i2c_write_byte(0x20,0x01,0xFF);   // enable all outputs
-  i2c_write_word(0x40,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
-  i2c_write_word(0x41,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
-  i2c_write_word(0x42,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
-  i2c_write_word(0x43,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
+  for(i=0;i<NUM_SENSORS;i++)
+  {
+    i2c_write_word(0x40+i,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
+  }
   
   setup_wifi();
-  byte temp[6];
 
   //get IP address, format and print
   ip = WiFi.localIP();
@@ -199,13 +204,16 @@ void setup() {
 }
 
 void loop() {
-char esp_sub[50];     //buffer for subscribe string
-char esp_pub[80];     //buffer for publish string
-  byte addr[8];
+  char esp_sub[50];     //buffer for subscribe string
+  char esp_pub[80];     //buffer for publish string
+//  byte addr[8];
   long rssi;    //wifi signal strength
   long quali;   //wifi signal quality
   int temp_count=0;
   static int delay_count=0;
+  float input_voltage;
+  float current=0, voltage=0;
+  int i=0;
   
   if (!client.connected()) {
     reconnect();
@@ -235,31 +243,6 @@ char esp_pub[80];     //buffer for publish string
     input_voltage=(analogRead(A0))*18.37/1024.0; // for voltage divider 330k|19k
     Serial.print("Input voltage: ");
     Serial.println(input_voltage);
-    
-    voltage1=i2c_read_word(0x40, 0x02)*0.00125;
-    Serial.print("   Voltage 1: (V)");
-    Serial.println(voltage1);
-    current1=i2c_read_word(0x40, 0x04)*0.00025;
-    Serial.print("   Current 1: (A)");
-    Serial.println(current1);
-    voltage2=i2c_read_word(0x41, 0x02)*0.00125;
-    Serial.print("   Voltage 2: (V)");
-    Serial.println(voltage2);
-    current2=i2c_read_word(0x41, 0x04)*0.00025;
-    Serial.print("   Current 2: (A)");
-    Serial.println(current2);
-    voltage3=i2c_read_word(0x42, 0x02)*0.00125;
-    Serial.print("   Voltage 3: (V)");
-    Serial.println(voltage3);
-    current3=i2c_read_word(0x42, 0x04)*0.00025;
-    Serial.print("   Current 3: (A)");
-    Serial.println(current3);
-    voltage4=i2c_read_word(0x43, 0x02)*0.00125;
-    Serial.print("   Voltage 4: (V)");
-    Serial.println(voltage4);
-    current4=i2c_read_word(0x43, 0x04)*0.00025;
-    Serial.print("   Current 4: (A)");
-    Serial.println(current4);
 
     lastMsg = now;
     if ( delay_count > 0 ) delay_count--;
@@ -267,20 +250,17 @@ char esp_pub[80];     //buffer for publish string
       delay_count = 6;
 //      delay_count = 60;
       // send version
-      strcpy(esp_pub, esp_mac);                 //combine publish topic MAC + topic
-      strcat(esp_pub, "/version");
+      snprintf (esp_pub, 50, "%s/version", esp_mac); // create topic with mac address
       client.publish(esp_pub, versionsstand );  //module sends to this topic
       Serial.println("send - version");
 
       // send MAC
-      strcpy(esp_pub, esp_mac);                 //combine publish topic MAC + topic
-      strcat(esp_pub, "/mac");
+      snprintf (esp_pub, 50, "%s/mac", esp_mac); // create topic with mac address
       client.publish(esp_pub, esp_mac );        //module sends to this topic
       Serial.println("send - mac");      
 
       // send IP
-      strcpy(esp_pub, esp_mac);                 //combine publish topic MAC + topic
-      strcat(esp_pub, "/ip");
+      snprintf (esp_pub, 50, "%s/ip", esp_mac); // create topic with mac address
       client.publish(esp_pub, esp_ip );         //module sends to this topic
       Serial.println("send - IP");      
 
@@ -291,10 +271,9 @@ char esp_pub[80];     //buffer for publish string
       if (quali > 100) { quali = 100; }
       if (quali < 0 ) { quali = 0; } 
       sprintf(msg, "%ddBm / %d%%", rssi, quali);
-      strcpy(esp_pub, esp_mac);                 //ombine publish topic MAC + topic
-      strcat(esp_pub, "/wlan");
+      snprintf (esp_pub, 50, "%s/wlan", esp_mac); // create topic with mac address
       client.publish(esp_pub, msg);
-      Serial.print("sende - wifi quality: ");        
+      Serial.print("send - wifi quality: ");        
       Serial.print(esp_pub);        
       Serial.println(msg);        
 
@@ -302,24 +281,28 @@ char esp_pub[80];     //buffer for publish string
 
     Serial.println("Publish mqtt messages");
     snprintf (msg, 50, "%f", input_voltage);
-    client.publish("stromwaechter/vbus", msg);
+    snprintf (esp_pub, 50, "%s/vbus", esp_mac); // create topic with mac address
+    client.publish(esp_pub, msg);
     snprintf (msg, 50, "%f", temp_ds);
-    client.publish("stromwaechter/temperature", msg);
-    snprintf (msg, 50, "%f", voltage1);
-    client.publish("stromwaechter/1/voltage", msg);
-    snprintf (msg, 50, "%f", current1);
-    client.publish("stromwaechter/1/current", msg);
-    snprintf (msg, 50, "%f", voltage2);
-    client.publish("stromwaechter/2/voltage", msg);
-    snprintf (msg, 50, "%f", current2);
-    client.publish("stromwaechter/2/current", msg);
-    snprintf (msg, 50, "%f", voltage3);
-    client.publish("stromwaechter/3/voltage", msg);
-    snprintf (msg, 50, "%f", current3);
-    client.publish("stromwaechter/3/current", msg);
-    snprintf (msg, 50, "%f", voltage4);
-    client.publish("stromwaechter/4/voltage", msg);
-    snprintf (msg, 50, "%f", current4);
-    client.publish("stromwaechter/4/current", msg);
+    snprintf (esp_pub, 50, "%s/temperature", esp_mac); // create topic with mac address
+    client.publish(esp_pub, msg);
+    for(i=0;i<NUM_SENSORS;i++)
+    {
+// read sensor values
+      voltage=i2c_read_word(0x40+i, 0x02)*0.00125;
+      Serial.print("   Voltage: (V)");
+      Serial.println(voltage);
+      current=i2c_read_word(0x40+i, 0x04)*0.00025;
+      Serial.print("   Current: (A)");
+      Serial.println(current);
+
+// publish mqtt messages
+      snprintf (msg, 50, "%f", voltage);
+      snprintf (esp_pub, 50, "%s/%i/voltage", esp_mac, i+1); // create topic with mac address
+      client.publish(esp_pub, msg);
+      snprintf (msg, 50, "%f", current);
+      snprintf (esp_pub, 50, "%s/%i/current", esp_mac, i+1); // create topic with mac address
+      client.publish(esp_pub, msg);
+    }
   }
 }
