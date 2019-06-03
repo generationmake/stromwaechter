@@ -9,6 +9,7 @@
  * 2019-06-01 - made mqtt messages more modular; included mac address in mqtt message
  * 2019-06-01 - added state to mqtt messages
  * 2019-06-03 - check bus voltage and turn channels on and off
+ * 2019-06-03 - support up to 4 boards
  
  Based on the Basic ESP8266 MQTT example of the PubSubClient library.
 
@@ -39,13 +40,17 @@ MQTT messages:
 #include "i2c_helper.h"
 
 #define ledPin 12       // the blue LED
-#define NUM_SENSORS 4   // define number of sensors
+#define NUM_SENSORS 8   // define number of sensors (max 16)
 
 const float onoff[NUM_SENSORS][2]={
   {13.0,12.8},    // channel 1 start at 13.0 V, stop at 12.8 V
   {12.7,12.5},    // channel 2 start at 12.7 V, stop at 12.5 V
   {12.4,12.2},    // channel 3 start at 12.4 V, stop at 12.2 V
-  {12.1,11.8}     // channel 4 start at 12.1 V, stop at 11.8 V
+  {12.1,11.8},    // channel 4 start at 12.1 V, stop at 11.8 V
+  {0,0},          // channel 5 start at 0.0 V, stop at 0.0 V
+  {0,0},          // channel 6 start at 0.0 V, stop at 0.0 V
+  {0,0},          // channel 7 start at 0.0 V, stop at 0.0 V
+  {0,0}           // channel 8 start at 0.0 V, stop at 0.0 V
 };
 
 #define ONE_WIRE_BUS 2  // DS18B20 pin
@@ -185,6 +190,21 @@ void setup() {
 
   i2c_write_byte(0x20,0x03,0);
   i2c_write_byte(0x20,0x01,0);   // disable all outputs
+  if(NUM_SENSORS>4)
+  {
+    i2c_write_byte(0x21,0x03,0);
+    i2c_write_byte(0x21,0x01,0);   // disable all outputs    
+  }
+  if(NUM_SENSORS>8)
+  {
+    i2c_write_byte(0x22,0x03,0);
+    i2c_write_byte(0x22,0x01,0);   // disable all outputs    
+  }
+  if(NUM_SENSORS>12)
+  {
+    i2c_write_byte(0x23,0x03,0);
+    i2c_write_byte(0x23,0x01,0);   // disable all outputs    
+  }
   for(i=0;i<NUM_SENSORS;i++)
   {
     i2c_write_word(0x40+i,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
@@ -312,7 +332,10 @@ void loop() {
       }
 
 //enable/disable channels
-      i2c_write_byte(0x20,0x01,state&0xF);   // set outputs
+      if(i<4) i2c_write_byte(0x20,0x01,state&0x000F);   // set outputs on first pcb
+      else if(i<8) i2c_write_byte(0x21,0x01,(state>>4)&0x000F);   // set outputs on second pcb
+      else if(i<12) i2c_write_byte(0x22,0x01,(state>>8)&0x000F);   // set outputs on second pcb
+      else if(i<16) i2c_write_byte(0x23,0x01,(state>>12)&0x000F);   // set outputs on second pcb
 
 // read sensor values
       voltage=i2c_read_word(0x40+i, 0x02)*0.00125;
