@@ -8,6 +8,7 @@
  * 2019-05-30 - cleaned up code and comments
  * 2019-06-01 - made mqtt messages more modular; included mac address in mqtt message
  * 2019-06-01 - added state to mqtt messages
+ * 2019-06-03 - check bus voltage and turn channels on and off
  
  Based on the Basic ESP8266 MQTT example of the PubSubClient library.
 
@@ -40,13 +41,20 @@ MQTT messages:
 #define ledPin 12       // the blue LED
 #define NUM_SENSORS 4   // define number of sensors
 
+const float onoff[NUM_SENSORS][2]={
+  {13.0,12.8},    // channel 1 start at 13.0 V, stop at 12.8 V
+  {12.7,12.5},    // channel 2 start at 12.7 V, stop at 12.5 V
+  {12.4,12.2},    // channel 3 start at 12.4 V, stop at 12.2 V
+  {12.1,11.8}     // channel 4 start at 12.1 V, stop at 11.8 V
+};
+
 #define ONE_WIRE_BUS 2  // DS18B20 pin
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature DS18B20(&oneWire);
 
 // Update these with values suitable for your network.
 
-const char* versionstring = "esp8266_stromwaechter_vx.y_20190601";   //is sent to MQTT broker
+const char* versionstring = "esp8266_stromwaechter_vx.y_20190603";   //is sent to MQTT broker
 const char* ssid = "openhab";
 const char* password = "openhabopenhab";
 const char* mqtt_server = "192.168.35.1";
@@ -176,7 +184,7 @@ void setup() {
     Serial.println("done\n");
 
   i2c_write_byte(0x20,0x03,0);
-  i2c_write_byte(0x20,0x01,0xFF);   // enable all outputs
+  i2c_write_byte(0x20,0x01,0);   // disable all outputs
   for(i=0;i<NUM_SENSORS;i++)
   {
     i2c_write_word(0x40+i,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
@@ -211,6 +219,7 @@ void loop() {
   float input_voltage;
   float temp_ds=0;
   float current=0, voltage=0;
+  static int state=0;
   int i=0;
   
   if (!client.connected()) {
@@ -284,6 +293,27 @@ void loop() {
     client.publish(esp_pub, msg);
     for(i=0;i<NUM_SENSORS;i++)
     {
+//check and set state
+      if(!(state&(1<<i))) // if state off
+      {
+        if(input_voltage>=onoff[i][0]) 
+        {
+          state|=(1<<i);  // bus voltage higher than defined
+          Serial.println("turn channel on");
+        }
+      }
+      else if(state&(1<<i)) // if state on
+      {
+        if(input_voltage<onoff[i][1]) 
+        {
+          state&=~(1<<i);  // bus voltage lower than defined
+          Serial.println("turn channel off");
+        }
+      }
+
+//enable/disable channels
+      i2c_write_byte(0x20,0x01,state&0xF);   // set outputs
+
 // read sensor values
       voltage=i2c_read_word(0x40+i, 0x02)*0.00125;
       Serial.print("   Voltage: (V)");
@@ -299,7 +329,8 @@ void loop() {
       snprintf (msg, 50, "%f", current);
       snprintf (esp_pub, 50, "%s/%i/current", esp_mac, i+1); // create topic with mac address
       client.publish(esp_pub, msg);
-      snprintf (msg, 50, "1");
+      if(!(state&(1<<i))) snprintf (msg, 50, "0");   // state off
+      else snprintf (msg, 50, "1");
       snprintf (esp_pub, 50, "%s/%i/state", esp_mac, i+1); // create topic with mac address
       client.publish(esp_pub, msg);
     }
