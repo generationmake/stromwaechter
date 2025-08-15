@@ -294,7 +294,7 @@ void loop() {
       quali = 2*(rssi +100);
       if (quali > 100) { quali = 100; }
       if (quali < 0 ) { quali = 0; }
-      sprintf(msg, "%ddBm / %d%%", (int)rssi, quali);
+      sprintf(msg, "%ddBm / %d%%", (int)rssi, (int)quali);
       snprintf (esp_pub, 50, "%s/wlan", esp_mac); // create topic with mac address
       client.publish(esp_pub, msg);
       Serial.print("send - wifi quality: ");
