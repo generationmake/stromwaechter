@@ -59,7 +59,7 @@ DallasTemperature DS18B20(&oneWire);
 
 // Update these with values suitable for your network.
 
-const char* versionstring = "esp8266_stromwaechter_vx.y_20190603";   //is sent to MQTT broker
+const char* versionstring = "esp8266_stromwaechter_vx.y_20250815";   //is sent to MQTT broker
 const char* ssid = "openhab";
 const char* password = "openhabopenhab";
 const char* mqtt_server = "192.168.35.1";
