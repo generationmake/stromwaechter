@@ -20,4 +20,3 @@ The board send the following MQTT messages:
 \<mac\> is like b4-e6-2d-3f-62-05
 
 \<numsensor\> is 1 for the first channel, 2 for the second and so on
-  

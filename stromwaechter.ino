@@ -1,5 +1,5 @@
 /*
- * 
+ *
  * Software for the stromwaechter pcb
  * http://stromwaechter.generationmake.de
  * Bernhard Mayer, DL1MAB, bernhard@generationmake.de
@@ -10,7 +10,7 @@
  * 2019-06-01 - added state to mqtt messages
  * 2019-06-03 - check bus voltage and turn channels on and off
  * 2019-06-03 - support up to 4 boards
- 
+
  Based on the Basic ESP8266 MQTT example of the PubSubClient library.
 
 it reads all the sensors and sends the status every 10 seconds.
@@ -153,7 +153,7 @@ void setup() {
   Serial.println(DS18B20.isParasitePowerMode());
 
   Serial.println("Scanning I2C...");
- 
+
   nDevices = 0;
   for(address = 1; address < 127; address++ )
   {
@@ -162,7 +162,7 @@ void setup() {
     // a device did acknowledge to the address.
     Wire.beginTransmission(address);
     error = Wire.endTransmission();
- 
+
     if (error == 0)
     {
       Serial.print("I2C device found at address 0x");
@@ -179,7 +179,7 @@ void setup() {
       if (address<16)
         Serial.print("0");
       Serial.println(address,HEX);
-    }    
+    }
   }
   if (nDevices == 0)
     Serial.println("No I2C devices found\n");
@@ -191,23 +191,23 @@ void setup() {
   if(NUM_SENSORS>4)
   {
     i2c_write_byte(0x21,0x03,0);
-    i2c_write_byte(0x21,0x01,0);   // disable all outputs    
+    i2c_write_byte(0x21,0x01,0);   // disable all outputs
   }
   if(NUM_SENSORS>8)
   {
     i2c_write_byte(0x22,0x03,0);
-    i2c_write_byte(0x22,0x01,0);   // disable all outputs    
+    i2c_write_byte(0x22,0x01,0);   // disable all outputs
   }
   if(NUM_SENSORS>12)
   {
     i2c_write_byte(0x23,0x03,0);
-    i2c_write_byte(0x23,0x01,0);   // disable all outputs    
+    i2c_write_byte(0x23,0x01,0);   // disable all outputs
   }
   for(i=0;i<NUM_SENSORS;i++)
   {
     i2c_write_word(0x40+i,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
   }
-  
+
   setup_wifi();
 
   //get IP address, format and print
@@ -239,7 +239,7 @@ void loop() {
   float current=0, voltage=0;
   static int state=0;
   int i=0;
-  
+
   if (!client.connected()) {
     reconnect();
   }
@@ -251,8 +251,8 @@ void loop() {
     if(DS18B20.getDeviceCount()>0)
     {
       do {
-        DS18B20.requestTemperatures(); 
-  //      DS18B20.requestTemperaturesByIndex(0); 
+        DS18B20.requestTemperatures();
+  //      DS18B20.requestTemperaturesByIndex(0);
         delay(1000);  // delay for parasite power
         temp_ds = DS18B20.getTempCByIndex(0);
         Serial.print("Temperature: ");
@@ -262,7 +262,7 @@ void loop() {
       } while ((temp_ds == 85.0 || temp_ds == (-127.0)) && temp_count < 20);
       if(temp_count==20) temp_ds=0;
     }
-  
+
     // input voltage:
   //  input_voltage=(analogRead(A0))*17.5/1024.0; // for voltage divider 330k|20k
     input_voltage=(analogRead(A0))*18.37/1024.0; // for voltage divider 330k|19k
@@ -282,24 +282,24 @@ void loop() {
       // send MAC
       snprintf (esp_pub, 50, "%s/mac", esp_mac); // create topic with mac address
       client.publish(esp_pub, esp_mac );        //module sends to this topic
-      Serial.println("send - mac");      
+      Serial.println("send - mac");
 
       // send IP
       snprintf (esp_pub, 50, "%s/ip", esp_mac); // create topic with mac address
       client.publish(esp_pub, esp_ip );         //module sends to this topic
-      Serial.println("send - IP");      
+      Serial.println("send - IP");
 
       // send wifi quality
       rssi = WiFi.RSSI();
       quali = 2*(rssi +100);
       if (quali > 100) { quali = 100; }
-      if (quali < 0 ) { quali = 0; } 
+      if (quali < 0 ) { quali = 0; }
       sprintf(msg, "%ddBm / %d%%", rssi, quali);
       snprintf (esp_pub, 50, "%s/wlan", esp_mac); // create topic with mac address
       client.publish(esp_pub, msg);
-      Serial.print("send - wifi quality: ");        
-      Serial.print(esp_pub);        
-      Serial.println(msg);        
+      Serial.print("send - wifi quality: ");
+      Serial.print(esp_pub);
+      Serial.println(msg);
     }
 
     Serial.println("Publish mqtt messages");
@@ -314,7 +314,7 @@ void loop() {
 //check and set state
       if(!(state&(1<<i))) // if state off
       {
-        if(input_voltage>=onoff[i][0]) 
+        if(input_voltage>=onoff[i][0])
         {
           state|=(1<<i);  // bus voltage higher than defined
           Serial.println("turn channel on");
@@ -322,7 +322,7 @@ void loop() {
       }
       else if(state&(1<<i)) // if state on
       {
-        if(input_voltage<onoff[i][1]) 
+        if(input_voltage<onoff[i][1])
         {
           state&=~(1<<i);  // bus voltage lower than defined
           Serial.println("turn channel off");
