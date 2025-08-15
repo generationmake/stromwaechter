@@ -96,7 +96,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
-  for (int i = 0; i < length; i++) {
+  for (unsigned int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
@@ -228,7 +228,7 @@ void setup() {
 }
 
 void loop() {
-  char esp_sub[50];     //buffer for subscribe string
+//  char esp_sub[50];     //buffer for subscribe string
   char esp_pub[80];     //buffer for publish string
   long rssi;    //wifi signal strength
   long quali;   //wifi signal quality
@@ -294,7 +294,7 @@ void loop() {
       quali = 2*(rssi +100);
       if (quali > 100) { quali = 100; }
       if (quali < 0 ) { quali = 0; }
-      sprintf(msg, "%ddBm / %d%%", rssi, quali);
+      sprintf(msg, "%ddBm / %d%%", (int)rssi, quali);
       snprintf (esp_pub, 50, "%s/wlan", esp_mac); // create topic with mac address
       client.publish(esp_pub, msg);
       Serial.print("send - wifi quality: ");
