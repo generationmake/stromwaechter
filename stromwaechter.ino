@@ -230,8 +230,8 @@ void setup() {
 void loop() {
 //  char esp_sub[50];     //buffer for subscribe string
   char esp_pub[80];     //buffer for publish string
-  long rssi;    //wifi signal strength
-  long quali;   //wifi signal quality
+  int rssi;    //wifi signal strength
+  int quali;   //wifi signal quality
   int temp_count=0;
   static int delay_count=0;
   float input_voltage;
@@ -294,7 +294,7 @@ void loop() {
       quali = 2*(rssi +100);
       if (quali > 100) { quali = 100; }
       if (quali < 0 ) { quali = 0; }
-      sprintf(msg, "%ddBm / %d%%", (int)rssi, (int)quali);
+      sprintf(msg, "%ddBm / %d%%", rssi, quali);
       snprintf (esp_pub, 50, "%s/wlan", esp_mac); // create topic with mac address
       client.publish(esp_pub, msg);
       Serial.print("send - wifi quality: ");
