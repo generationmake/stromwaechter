@@ -44,6 +44,7 @@ jobs:
             - source-path: ./
             - source-url: https://github.com/PaulStoffregen/OneWire.git
             - name: DallasTemperature
+            - name: ADS1115_WE
             - source-url: https://github.com/knolleary/pubsubclient.git
 
           sketches-report-path: ${{ env.SKETCHES_REPORTS_PATH }}

@@ -37,10 +37,12 @@ MQTT messages:
 #include <Wire.h> // i2c-bib
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <ADS1115_WE.h>
 #include "i2c_helper.h"
 
 #define ledPin 12       // the blue LED
 #define NUM_SENSORS 8   // define number of sensors (max 16)
+#define NUM_CURRENT 4   // define number of current sensors (max 4)
 
 const float onoff[NUM_SENSORS][2]={
   {13.0,12.8},    // channel 1 start at 13.0 V, stop at 12.8 V
@@ -56,6 +58,7 @@ const float onoff[NUM_SENSORS][2]={
 #define ONE_WIRE_BUS 2  // DS18B20 pin
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature DS18B20(&oneWire);
+ADS1115_WE ads1115 = ADS1115_WE();
 
 // Update these with values suitable for your network.
 
@@ -133,6 +136,13 @@ void reconnect() {
   }
 }
 
+float readChannel(ADS1115_MUX channel) {
+  float voltage = 0.0;
+  ads1115.setCompareChannels(channel);
+  voltage = ads1115.getResult_V(); // alternative: getResult_mV for Millivolt
+  return voltage;
+}
+
 void setup() {
   byte error,address,i;
   byte temp[6];
@@ -206,6 +216,16 @@ void setup() {
   for(i=0;i<NUM_SENSORS;i++)
   {
     i2c_write_word(0x40+i,0x05,0x0400); // value for shunt 20 mOhm - max current=4.096 A
+  }
+
+  if(NUM_CURRENT>0)
+  {
+    if(!ads1115.init()){
+      Serial.println("ADS1115 not connected!");
+    }
+    ads1115.setVoltageRange_mV(ADS1115_RANGE_6144); //comment line/change parameter to change range
+    ads1115.setCompareChannels(ADS1115_COMP_0_GND); //comment line/change parameter to change channel
+    ads1115.setMeasureMode(ADS1115_CONTINUOUS); //comment line/change parameter to change mode
   }
 
   setup_wifi();
@@ -353,6 +373,23 @@ void loop() {
       if(!(state&(1<<i))) snprintf (msg, 50, "0");   // state off
       else snprintf (msg, 50, "1");
       snprintf (esp_pub, 50, "%s/%i/state", esp_mac, i+1); // create topic with mac address
+      client.publish(esp_pub, msg);
+    }
+    for(i=0;i<NUM_CURRENT;i++)
+    {
+
+      float ads_voltage = 0.0;
+
+      Serial.print("ADS1115 ");
+      Serial.print(i);
+      Serial.print(": ");
+      if(i==0) ads_voltage = readChannel(ADS1115_COMP_0_GND);
+      else if(i==1) ads_voltage = readChannel(ADS1115_COMP_1_GND);
+      else if(i==2) ads_voltage = readChannel(ADS1115_COMP_2_GND);
+      else ads_voltage = readChannel(ADS1115_COMP_3_GND);
+      Serial.print(ads_voltage);
+      snprintf (msg, 50, "%f", ads_voltage);
+      snprintf (esp_pub, 50, "%s/c%i/voltage", esp_mac, i+1); // create topic with mac address
       client.publish(esp_pub, msg);
     }
   }
