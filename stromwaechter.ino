@@ -62,7 +62,7 @@ ADS1115_WE ads1115 = ADS1115_WE();
 
 // Update these with values suitable for your network.
 
-const char* versionstring = "esp8266_stromwaechter_vx.y_20250815";   //is sent to MQTT broker
+const char* versionstring = "esp8266_stromwaechter_vx.y_20250822";   //is sent to MQTT broker
 const char* ssid = "openhab";
 const char* password = "openhabopenhab";
 const char* mqtt_server = "192.168.35.1";
@@ -139,8 +139,14 @@ void reconnect() {
 float readChannel(ADS1115_MUX channel) {
   float voltage = 0.0;
   ads1115.setCompareChannels(channel);
-  voltage = ads1115.getResult_V(); // alternative: getResult_mV for Millivolt
+  voltage = ads1115.getResult_mV(); // alternative: getResult_mV for Millivolt
   return voltage;
+}
+int readChannelraw(ADS1115_MUX channel) {
+  int value = 0.0;
+  ads1115.setCompareChannels(channel);
+  value = ads1115.getRawResult(); // read raw value
+  return value;
 }
 
 void setup() {
@@ -223,7 +229,7 @@ void setup() {
     if(!ads1115.init()){
       Serial.println("ADS1115 not connected!");
     }
-    ads1115.setVoltageRange_mV(ADS1115_RANGE_6144); //comment line/change parameter to change range
+    ads1115.setVoltageRange_mV(ADS1115_RANGE_4096); //comment line/change parameter to change range
     ads1115.setCompareChannels(ADS1115_COMP_0_GND); //comment line/change parameter to change channel
     ads1115.setMeasureMode(ADS1115_CONTINUOUS); //comment line/change parameter to change mode
   }
@@ -379,6 +385,7 @@ void loop() {
     {
 
       float ads_voltage = 0.0;
+      int ads_raw = 0;
 
       Serial.print("ADS1115 ");
       Serial.print(i);
@@ -387,8 +394,14 @@ void loop() {
       else if(i==1) ads_voltage = readChannel(ADS1115_COMP_1_GND);
       else if(i==2) ads_voltage = readChannel(ADS1115_COMP_2_GND);
       else ads_voltage = readChannel(ADS1115_COMP_3_GND);
-      Serial.print(ads_voltage);
+      Serial.println(ads_voltage);
       snprintf (msg, 50, "%f", ads_voltage);
+      // if(i==0) ads_raw = readChannelraw(ADS1115_COMP_0_GND);
+      // else if(i==1) ads_raw = readChannelraw(ADS1115_COMP_1_GND);
+      // else if(i==2) ads_raw = readChannelraw(ADS1115_COMP_2_GND);
+      // else ads_raw = readChannelraw(ADS1115_COMP_3_GND);
+      // Serial.println(ads_raw);
+      // snprintf (msg, 50, "%i", ads_raw);
       snprintf (esp_pub, 50, "%s/c%i/voltage", esp_mac, i+1); // create topic with mac address
       client.publish(esp_pub, msg);
     }
