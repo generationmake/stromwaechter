@@ -14,14 +14,14 @@ void i2c_write(char address, char value)
 void i2c_write_byte(char address, char reg, char value)
 {
   Wire.beginTransmission(address);
-  Wire.write(reg); // power up continous mode
+  Wire.write(reg); // power up continuous mode
   Wire.write(value);
   Wire.endTransmission();
 }
 void i2c_write_word(char address, char reg, short int value)
 {
   Wire.beginTransmission(address);
-  Wire.write(reg); // power up continous mode
+  Wire.write(reg); // power up continuous mode
   Wire.write((value&0xff00)>>8);
   Wire.write(value&0x00ff);
   Wire.endTransmission();

@@ -1,0 +1,58 @@
+name: Compile
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/compile-fw.yml"
+      - "stromwaechter.ino"
+
+  push:
+    paths:
+      - ".github/workflows/compile-fw.yml"
+      - "stromwaechter.ino"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      SKETCHES_REPORTS_PATH: sketches-reports
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        board:
+          - fqbn: esp8266:esp8266:generic
+            platforms: |
+              - name: esp8266:esp8266
+                source-url: https://arduino.esp8266.com/stable/package_esp8266com_index.json
+
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile
+        uses: arduino/compile-sketches@main
+        with:
+          fqbn: ${{ matrix.board.fqbn }}
+          platforms: ${{ matrix.board.platforms }}
+          enable-deltas-report: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          libraries: |
+            - source-path: ./
+            - source-url: https://github.com/PaulStoffregen/OneWire.git
+            - name: DallasTemperature
+            - name: ADS1115_WE
+            - source-url: https://github.com/knolleary/pubsubclient.git
+
+          sketches-report-path: ${{ env.SKETCHES_REPORTS_PATH }}
+          sketch-paths: ./
+
+      - name: Save memory usage change report as artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SKETCHES_REPORTS_PATH }}
+          path: ${{ env.SKETCHES_REPORTS_PATH }}
