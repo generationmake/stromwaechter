@@ -395,14 +395,16 @@ void loop() {
       else if(i==2) ads_voltage = readChannel(ADS1115_COMP_2_GND);
       else ads_voltage = readChannel(ADS1115_COMP_3_GND);
       Serial.println(ads_voltage);
-      snprintf (msg, 50, "%f", ads_voltage);
+      float current_value=(ads_voltage - 1650)/50;    // 50mV/A for WCS1800 @ 3.3V
+      Serial.println(current_value);
+      snprintf (msg, 50, "%f", current_value);
       // if(i==0) ads_raw = readChannelraw(ADS1115_COMP_0_GND);
       // else if(i==1) ads_raw = readChannelraw(ADS1115_COMP_1_GND);
       // else if(i==2) ads_raw = readChannelraw(ADS1115_COMP_2_GND);
       // else ads_raw = readChannelraw(ADS1115_COMP_3_GND);
       // Serial.println(ads_raw);
       // snprintf (msg, 50, "%i", ads_raw);
-      snprintf (esp_pub, 50, "%s/c%i/voltage", esp_mac, i+1); // create topic with mac address
+      snprintf (esp_pub, 50, "%s/c%i/current", esp_mac, i+1); // create topic with mac address
       client.publish(esp_pub, msg);
     }
   }
