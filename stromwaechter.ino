@@ -42,7 +42,7 @@ MQTT messages:
 
 #define ledPin 12       // the blue LED
 #define NUM_SENSORS 8   // define number of sensors (max 16)
-#define NUM_CURRENT 4   // define number of current sensors (max 4)
+#define NUM_CURRENT 2   // define number of current sensors (max 4)
 
 const float onoff[NUM_SENSORS][2]={
   {13.0,12.8},    // channel 1 start at 13.0 V, stop at 12.8 V
@@ -56,10 +56,8 @@ const float onoff[NUM_SENSORS][2]={
 };
 
 const float current_calib[NUM_CURRENT][2]={
-  {1650.0,50.0},    // current sensor 1, Zero Current Vout = 1650 mV, Sensitivity = 50 mV/A
-  {1650.0,50.0},    // current sensor 2, Zero Current Vout = 1650 mV, Sensitivity = 50 mV/A
-  {1650.0,50.0},    // current sensor 3, Zero Current Vout = 1650 mV, Sensitivity = 50 mV/A
-  {1650.0,50.0}     // current sensor 4, Zero Current Vout = 1650 mV, Sensitivity = 50 mV/A
+  {1674.0,45.0},    // current sensor 1, Zero Current Vout = 1650 mV, Sensitivity = 50 mV/A
+  {1696.0,45.0},    // current sensor 2, Zero Current Vout = 1650 mV, Sensitivity = 50 mV/A
 };
 
 #define ONE_WIRE_BUS 2  // DS18B20 pin
@@ -69,7 +67,7 @@ ADS1115_WE ads1115 = ADS1115_WE();
 
 // Update these with values suitable for your network.
 
-const char* versionstring = "esp8266_stromwaechter_vx.y_20250822";   //is sent to MQTT broker
+const char* versionstring = "esp8266_stromwaechter_vx.y_20250824";   //is sent to MQTT broker
 const char* ssid = "openhab";
 const char* password = "openhabopenhab";
 const char* mqtt_server = "192.168.35.1";
