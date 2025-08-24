@@ -55,6 +55,13 @@ const float onoff[NUM_SENSORS][2]={
   {0,0}           // channel 8 start at 0.0 V, stop at 0.0 V
 };
 
+const float current_calib[NUM_CURRENT][2]={
+  {1650.0,50.0},    // current sensor 1, Zero Current Vout = 1650 mV, Sensitivity = 50 mV/A
+  {1650.0,50.0},    // current sensor 2, Zero Current Vout = 1650 mV, Sensitivity = 50 mV/A
+  {1650.0,50.0},    // current sensor 3, Zero Current Vout = 1650 mV, Sensitivity = 50 mV/A
+  {1650.0,50.0}     // current sensor 4, Zero Current Vout = 1650 mV, Sensitivity = 50 mV/A
+};
+
 #define ONE_WIRE_BUS 2  // DS18B20 pin
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature DS18B20(&oneWire);
@@ -395,7 +402,7 @@ void loop() {
       else if(i==2) ads_voltage = readChannel(ADS1115_COMP_2_GND);
       else ads_voltage = readChannel(ADS1115_COMP_3_GND);
       Serial.println(ads_voltage);
-      float current_value=(ads_voltage - 1650)/50;    // 50mV/A for WCS1800 @ 3.3V
+      float current_value=(ads_voltage - current_calib[i][0])/current_calib[i][1];    // use calibration values from table on top
       Serial.println(current_value);
       snprintf (msg, 50, "%f", current_value);
       // if(i==0) ads_raw = readChannelraw(ADS1115_COMP_0_GND);
